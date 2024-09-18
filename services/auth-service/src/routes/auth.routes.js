@@ -84,33 +84,43 @@ router.get('/:userId', async (req, res) => {
     res.status(500).json({ message: 'Error fetching user', error: error.toString() });
   }
 });
-/*
-// 사용자 로그인
-router.post('/login', async (req, res) => {
+
+router.put('/:userId/rewards', async (req, res) => {
   try {
-    const { user_name, password } = req.body; // 비밀번호는 일반 텍스트로 받음
-    const user = await User.findOne({ user_name });
+    const { rewardGold, rewardDiamond } = req.body; // 요청으로 들어오는 보상 값
+
+    // 사용자 정보 조회
+    const user = await User.findById(req.params.userId);
+    
     if (!user) {
-      return res.status(401).json({ message: 'Invalid user' });
-    }
-    const isPasswordValid = await bcrypt.compare(password, user.password); // 비밀번호와 해시된 비밀번호 비교
-    console.log('비밀번호:', password);
-    console.log('디비에서 꺼낸 유저 비밀번호:',  user.password);
-    console.log('password == user.password', isPasswordValid);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid password' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
-    res.json({ message: 'Login successful', token });
+    // 기존 골드 및 다이아몬드 값에 보상을 더함
+    user.gold += rewardGold || 0; // 보상 골드가 없으면 0으로 처리
+    user.diamond += rewardDiamond || 0; // 보상 다이아몬드가 없으면 0으로 처리
+
+    // 변경된 값을 저장
+    await user.save();
+
+    // 갱신된 골드와 다이아몬드 정보 반환
+    res.json({
+      userId: user._id,
+      gold: user.gold,
+      diamond: user.diamond,
+      message: 'User rewards updated successfully',
+    });
+
   } catch (error) {
-    res.status(500).json({ message: 'Error logging in', error: error.message });
+    console.error('Error updating user rewards:', error);
+    res.status(500).json({ message: 'Error updating user rewards', error: error.message });
   }
-});*/
+});
 
 
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
+    // authMiddleware에서 디코딩된 userId를 이용하여 사용자를 조회
     const user = await User.findById(req.userId).select('-__v');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -120,43 +130,5 @@ router.get('/me', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Error fetching user', error: error.message });
   }
 });
-/*
-router.post('/register', async (req, res) => {
-  try {
-    const { user_name } = req.body;
-    const user = new User({ user_name });
-    await user.save();
-    res.status(201).json({ message: 'User registered successfully', user });
-  } catch (error) {
-    res.status(500).json({ message: 'Error registering user', error: error.message });
-  }
-});
 
-router.post('/login', async (req, res) => {
-    try {
-      const { user_name } = req.body;
-      const user = await User.findOne({ user_name });
-      if (!user) {
-        return res.status(401).json({ message: 'Authentication failed' });
-      }
-      const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
-      res.json({ message: 'Login successful', token });
-    } catch (error) {
-      res.status(500).json({ message: 'Error logging in', error: error.message });
-    }
-});
-
-
-router.get('/me', authMiddleware, async (req, res) => {
-    try {
-      const user = await User.findById(req.userId).select('-__v');
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching user', error: error.message });
-    }
-  });
-*/
 module.exports = router;
