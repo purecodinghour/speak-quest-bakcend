@@ -5,7 +5,7 @@ const redis = require('redis');
 const UserQuest = require('../models/user-quest.model');
 const User = require('../../../auth-service/src/models/user.model');
 const questCatalogApi = require('../services/quest-catalog-api');
-const rewardCatalogApi = require('../services/quest-catalog-api');
+const rewardCatalogApi = require('../services/reward-api');
 
 const Reward = require('../../../quest-catalog-service/src/models/reward.model'); // Reward 모델 참조
 const questStartQueue = require('../queues/quest-start.queue');
@@ -170,6 +170,16 @@ router.put('/update-progress', async (req, res) => {
       userQuest.status = 'completed';
       userQuest.completed_at = new Date();
     }
+    // 데이터베이스 업데이트
+    await UserQuest.updateOne(
+      { _id: userQuest._id },
+      { $set: userQuest }
+    );
+
+    const reward = await getReward(quest.reward_id);
+    if (userQuest.status === 'completed') {
+      await updateUserReward(user_id, reward);
+    }
 
     res.json(userQuest);
   } catch (error) {
@@ -236,6 +246,40 @@ async function grantRewardToUser(user_id, reward, session) {
     : { $inc: { diamond: reward.reward_qty } };
 
   await User.findByIdAndUpdate(user_id, rewardUpdate, { session });
+}
+
+async function updateUserReward(user_id, reward) {
+  try {
+    if (!reward) {
+      throw new Error('Reward not found');
+    }
+    const updateField = reward.reward_item === 'gold' ? 'gold' : 'diamond';
+    const updateAmount = reward.reward_qty;
+    console.log('updateField:', updateField);
+    console.log('updateAmount:', reward.reward_qty);
+    /*
+    const updatedUser = await User.findByIdAndUpdate(
+      user_id,
+      { $inc: { [updateField]: updateAmount } },
+      { new: true, lean: true }
+    );
+    */
+
+    /*
+    if (!updatedUser) {
+      throw new Error('User not found');
+    }
+
+    return {
+      rewardItem: reward.reward_item,
+      rewardQuantity: reward.reward_qty,
+      newBalance: updatedUser[updateField]
+    };
+    */
+  } catch (error) {
+    console.error('Error in updateUserReward:', error);
+    throw error;
+  }
 }
 
 module.exports = router;

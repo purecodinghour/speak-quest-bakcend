@@ -23,4 +23,17 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/:rewardId', async (req, res) => {
+  try {
+    const reward = await Reward.findById(req.params.rewardId);
+    if (!reward) {
+      return res.status(404).json({ message: 'reward not found' });
+    }
+    res.json(reward);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching reward', error: error.toString() });
+  }
+});
+
+
 module.exports = router;
