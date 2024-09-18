@@ -5,10 +5,10 @@ const redis = require('redis');
 const UserQuest = require('../models/user-quest.model');
 const User = require('../../../auth-service/src/models/user.model');
 const questCatalogApi = require('../services/quest-catalog-api');
+const rewardCatalogApi = require('../services/quest-catalog-api');
 
 const Reward = require('../../../quest-catalog-service/src/models/reward.model'); // Reward 모델 참조
 const questStartQueue = require('../queues/quest-start.queue');
-const cacheService = require('../services/cache.service');
 
 // Redis 클라이언트 설정
 const redisClient = redis.createClient();
@@ -44,6 +44,38 @@ async function getQuest(questId) {
     return quest;
   } catch (error) {
     console.error('Error fetching quest:', error);
+    throw error;
+  }
+}
+
+// 캐시에서 리워드 가져오기
+async function getRewardFromCache(rewardId) {
+  try {
+    const cachedReward = await redisClient.get(`reward:${rewardId}`);
+    if (cachedReward) {
+      return JSON.parse(cachedReward);
+    }
+    return null;
+  } catch (error) {
+    console.error('캐시에서 리워드 가져오기 오류:', error);
+    return null;
+  }
+}
+
+async function getReward(rewardId) {
+  try {
+    const cachedReward = await getRewardFromCache(rewardId);
+    if (cachedReward) {
+      return cachedReward;
+    }
+
+    const reward = await rewardCatalogApi.getReward(rewardId);
+    if (reward) {
+      await redisClient.set(`reward:${rewardId}`, JSON.stringify(reward), 'EX', 60);
+    }
+    return reward;
+  } catch (error) {
+    console.error('리워드 가져오기 오류:', error);
     throw error;
   }
 }
@@ -133,33 +165,25 @@ router.put('/update-progress', async (req, res) => {
       return res.status(404).json({ message: 'User quest not found' });
     }
 
+    const quest = await getQuest(quest_id);
+    if (progress >= quest.streak) {
+      userQuest.status = 'completed';
+      userQuest.completed_at = new Date();
+    }
+
     res.json(userQuest);
   } catch (error) {
     res.status(400).json({ message: 'Error updating quest progress', error: error.message });
   }
 });
 
-router.get('/quests/:questId', async (req, res) => {
-  try {
-    const quest = await Quest.findById(req.params.questId);
-    if (!quest) {
-      return res.status(404).json({ message: 'Quest not found' });
-    }
-    res.json(quest);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching quest', error: error.toString() });
-  }
-});
-
 // 사용자의 퀘스트 완료 및 보상 지급
-
 router.put('/complete', async (req, res) => {
   try {
     const { user_id, quest_id } = req.body;
-
     // 진행 중인 퀘스트 상태를 'completed'로 업데이트
     const userQuest = await UserQuest.findOneAndUpdate(
-      { user_id, quest_id, status: 'in_progress' },
+      { user_id: user_id, quest_id: quest_id, status: 'in_progress' },
       { status: 'completed', completed_at: new Date() },
       { new: true }
     );
@@ -174,7 +198,7 @@ router.put('/complete', async (req, res) => {
       return res.status(404).json({ message: 'Quest not found' });
     }
 
-    const reward = await Reward.findById(quest.reward_id);
+    const reward = await getReward(quest.reward_id);
     if (!reward) {
       return res.status(404).json({ message: 'Reward not found' });
     }
@@ -184,7 +208,7 @@ router.put('/complete', async (req, res) => {
       ? { $inc: { gold: reward.reward_qty } } 
       : { $inc: { diamond: reward.reward_qty } };
 
-    await User.findByIdAndUpdate(user_id, rewardUpdate);
+    await User.findByIdAndUpdate(userObjectId, rewardUpdate);
 
     res.json({ message: 'Quest completed and reward claimed', userQuest });
   } catch (error) {
@@ -193,9 +217,18 @@ router.put('/complete', async (req, res) => {
   }
 });
 
-module.exports = router;
 
-
+router.get('/quests/:questId', async (req, res) => {
+  try {
+    const quest = await Quest.findById(req.params.questId);
+    if (!quest) {
+      return res.status(404).json({ message: 'Quest not found' });
+    }
+    res.json(quest);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching quest', error: error.toString() });
+  }
+});
 // 보상 지급 로직을 별도로 분리하여 관리
 async function grantRewardToUser(user_id, reward, session) {
   const rewardUpdate = reward.reward_item === 'gold' 
