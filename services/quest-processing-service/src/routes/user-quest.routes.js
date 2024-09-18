@@ -6,6 +6,9 @@ const UserQuest = require('../models/user-quest.model');
 const User = require('../../../auth-service/src/models/user.model');
 const questCatalogApi = require('../services/quest-catalog-api');
 const rewardCatalogApi = require('../services/reward-api');
+const userApi = require('../services/user-api');
+const axios = require('axios');
+const config = require('../config');
 
 const Reward = require('../../../quest-catalog-service/src/models/reward.model'); // Reward 모델 참조
 const questStartQueue = require('../queues/quest-start.queue');
@@ -79,6 +82,39 @@ async function getReward(rewardId) {
     throw error;
   }
 }
+
+// 캐시에서 유저 가져오기
+async function getUserFromCache(userId) {
+  try {
+    const cachedUser = await redisClient.get(`quest:${userId}`);
+    if (cachedUser) {
+      return JSON.parse(cachedUser);
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching user from cache:', error);
+    return null;
+  }
+}
+
+async function getUser(userId) {
+  try {
+    const cachedUser = await getUserFromCache(userId);
+    if (cachedUser) {
+      return cachedUser;
+    }
+
+    const user = await userApi.getUser(userId);
+    if (user) {
+      await redisClient.set(`quest:${userId}`, JSON.stringify(user), 'EX', 60);
+    }
+    return user;
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    throw error;
+  }
+}
+
 
 // 사용자의 퀘스트 목록을 조회하며 관련된 사용자와 퀘스트 정보도 가져오기
 router.get('/', async (req, res) => {
@@ -170,16 +206,32 @@ router.put('/update-progress', async (req, res) => {
       userQuest.status = 'completed';
       userQuest.completed_at = new Date();
     }
+
+    if (userQuest.status === 'completed') {
+          // auto_claim일 경우 보상 자동 수령
+    if (quest.auto_claim) {
+      const reward = await getReward(quest.reward_id);
+      const rewardData = {
+        rewardGold: reward.reward_item === 'gold' ? reward.reward_qty : 0,
+        rewardDiamond: reward.reward_item === 'diamond' ? reward.reward_qty : 0,
+      };
+
+      // User 서비스로 API 요청하여 보상 업데이트
+      const userServiceUrl = `http://localhost:3000/auth/${user_id}/rewards`;  // User 서비스 URL
+      const response = await axios.put(userServiceUrl, rewardData);
+
+      if (response.status === 200) {
+        // 보상이 성공적으로 지급되었을 경우, 상태를 reward_claimed로 업데이트
+        userQuest.status = 'reward_claimed';
+      }
+    }
+    }
+
     // 데이터베이스 업데이트
     await UserQuest.updateOne(
       { _id: userQuest._id },
       { $set: userQuest }
     );
-
-    const reward = await getReward(quest.reward_id);
-    if (userQuest.status === 'completed') {
-      await updateUserReward(user_id, reward);
-    }
 
     res.json(userQuest);
   } catch (error) {
@@ -187,19 +239,22 @@ router.put('/update-progress', async (req, res) => {
   }
 });
 
-// 사용자의 퀘스트 완료 및 보상 지급
-router.put('/complete', async (req, res) => {
+/*
+router.put('/claimreward', async (req, res) => {
   try {
     const { user_id, quest_id } = req.body;
-    // 진행 중인 퀘스트 상태를 'completed'로 업데이트
-    const userQuest = await UserQuest.findOneAndUpdate(
-      { user_id: user_id, quest_id: quest_id, status: 'in_progress' },
-      { status: 'completed', completed_at: new Date() },
-      { new: true }
-    );
+
+    // 사용자 퀘스트 상태 확인
+    const userQuest = await UserQuest.findOne({ 
+      user_id, 
+      quest_id, 
+      status: 'completed' 
+    });
 
     if (!userQuest) {
-      return res.status(404).json({ message: 'Active user quest not found' });
+      return res.status(400).json({ 
+        message: 'Quest is not completed yet. Complete the quest before claiming the reward.' 
+      });
     }
 
     // 퀘스트와 연관된 보상 가져오기
@@ -213,19 +268,32 @@ router.put('/complete', async (req, res) => {
       return res.status(404).json({ message: 'Reward not found' });
     }
 
-    // 사용자에게 보상 지급
-    const rewardUpdate = reward.reward_item === 'gold' 
-      ? { $inc: { gold: reward.reward_qty } } 
-      : { $inc: { diamond: reward.reward_qty } };
+    const user = await getUser(user_id);
 
-    await User.findByIdAndUpdate(userObjectId, rewardUpdate);
+    if (userQuest.status === 'completed') {
+      await updateUserReward(user_id, reward);
+    }
 
-    res.json({ message: 'Quest completed and reward claimed', userQuest });
+    await user.findByIdAndUpdate(user_id, rewardUpdate);
+
+    // 보상 지급 후 퀘스트 상태를 'claimed'로 업데이트
+    userQuest.status = 'claimed';
+    userQuest.claimed_at = new Date();
+    await userQuest.save();
+
+    res.json({ 
+      message: 'Reward claimed successfully', 
+      userQuest 
+    });
+
   } catch (error) {
-    console.error('Error completing quest:', error);
-    res.status(500).json({ message: 'Error completing quest', error: error.toString() });
+    console.error('Error claiming reward:', error);
+    res.status(500).json({ 
+      message: 'Error claiming reward', 
+      error: error.toString() 
+    });
   }
-});
+});*/
 
 
 router.get('/quests/:questId', async (req, res) => {
@@ -257,24 +325,26 @@ async function updateUserReward(user_id, reward) {
     const updateAmount = reward.reward_qty;
     console.log('updateField:', updateField);
     console.log('updateAmount:', reward.reward_qty);
-    /*
+    
     const updatedUser = await User.findByIdAndUpdate(
       user_id,
       { $inc: { [updateField]: updateAmount } },
       { new: true, lean: true }
     );
-    */
-
-    /*
     if (!updatedUser) {
       throw new Error('User not found');
-    }
-
+    }  
     return {
       rewardItem: reward.reward_item,
       rewardQuantity: reward.reward_qty,
       newBalance: updatedUser[updateField]
-    };
+    };      
+    /*
+            // 데이터베이스 업데이트
+        await UserQuest.updateOne(
+          { _id: userQuest._id },
+          { $set: userQuest }
+        );
     */
   } catch (error) {
     console.error('Error in updateUserReward:', error);
