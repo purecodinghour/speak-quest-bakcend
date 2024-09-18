@@ -7,4 +7,5 @@ module.exports = {
   JWT_SECRET: process.env.JWT_SECRET || 'your_jwt_secret',
   QUEST_CATALOG_SERVICE_URL: process.env.QUEST_CATALOG_SERVICE_URL || 'http://localhost:3001',
   REWARD_CATALOG_SERVICE_URL: process.env.QUEST_CATALOG_SERVICE_URL || 'http://localhost:3001',
+  AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL || 'http://localhost:3000',
 };

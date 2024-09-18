@@ -6,8 +6,13 @@ const config = require('./config');
 const authProxy = createProxyMiddleware({
   target: 'http://localhost:3000', // Auth 서비스의 주소
   changeOrigin: true,
-  pathRewrite: {
-    '^/auth': '/auth'
+  pathRewrite: (path, req) => {
+    if (path.startsWith('/auth')) {
+      return path.replace('/auth', '/auth');
+    } else if (path.startsWith('/users')) {
+      return path.replace('/users', '/users');
+    }
+    return path;
   }
 });
 
@@ -53,7 +58,7 @@ const queryServiceProxy = createProxyMiddleware({
 const server = http.createServer((req, res) => {
   console.log(`Received request: ${req.method} ${req.url}`);
   
-  if (req.url.startsWith('/auth')) {
+  if (req.url.startsWith('/auth') || req.url.startsWith('/users')) {
     authProxy(req, res);
   } else if (req.url.startsWith('/quests') || req.url.startsWith('/rewards')) {
     questCatalogProxy(req, res);

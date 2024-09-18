@@ -33,6 +33,7 @@ app.use((req, res, next) => {
   console.log('Request body:', req.body);
   next();
 });
+
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to SpeakQuest auth service' });
 });
@@ -58,32 +59,3 @@ app.use((req, res, next) => {
   console.log('Request body:', req.body);
   next();
 });
-/*const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const config = require('./config');
-const authRoutes = require('./routes/auth.routes');
-
-const app = express();
-
-// CORS 설정
-app.use(cors({
-  origin: 'http://localhost:3004', // React 앱의 주소
-  credentials: true,
-}));
-
-app.use(express.json());
-
-mongoose.connect(config.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('Could not connect to MongoDB', err));
-
-app.use('/auth', authRoutes);
-
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to SpeakQuest auth service' });
-});
-
-app.listen(config.PORT, () => {
-  console.log(`Server is running on port ${config.PORT}`);
-});*/

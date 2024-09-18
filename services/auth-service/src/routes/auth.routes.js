@@ -40,6 +40,7 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ message: 'Error registering user', error: error.message });
   }
 });
+
 router.post('/login', async (req, res) => {
   console.log('Received login request:', req.body);
   try {
@@ -51,7 +52,6 @@ router.post('/login', async (req, res) => {
       console.log('User not found:', user_name); // 로그 추가
       return res.status(401).json({ message: 'Invalid user' });
     }
-
 
     console.log('받은 비밀번호: ', password); 
     console.log('저장된 비밀번호: ',user.password); 
@@ -73,6 +73,17 @@ router.post('/login', async (req, res) => {
   }
 });
 
+router.get('/:userId', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'user not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching user', error: error.toString() });
+  }
+});
 /*
 // 사용자 로그인
 router.post('/login', async (req, res) => {
