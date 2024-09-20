@@ -239,25 +239,22 @@ router.put('/update-progress', async (req, res) => {
   }
 });
 
-/*
+// 보상 수령 API
 router.put('/claimreward', async (req, res) => {
   try {
     const { user_id, quest_id } = req.body;
 
-    // 사용자 퀘스트 상태 확인
-    const userQuest = await UserQuest.findOne({ 
-      user_id, 
-      quest_id, 
-      status: 'completed' 
-    });
+    // 진행 중인 퀘스트가 있는지 확인
+    const userQuest = await UserQuest.findOne({ user_id, quest_id });
 
-    if (!userQuest) {
-      return res.status(400).json({ 
-        message: 'Quest is not completed yet. Complete the quest before claiming the reward.' 
-      });
+    if (!userQuest || userQuest.status !== 'completed') {
+      return res.status(400).json({ message: 'No completed quest found or reward already claimed.' });
     }
 
-    // 퀘스트와 연관된 보상 가져오기
+    // 보상이 이미 지급된 경우 확인
+    if (userQuest.status === 'reward_claimed') {
+      return res.status(400).json({ message: 'Reward already claimed.' });
+    }
     const quest = await getQuest(quest_id);
     if (!quest) {
       return res.status(404).json({ message: 'Quest not found' });
@@ -268,33 +265,31 @@ router.put('/claimreward', async (req, res) => {
       return res.status(404).json({ message: 'Reward not found' });
     }
 
-    const user = await getUser(user_id);
+    const rewardData = {
+      rewardGold: reward.reward_item === 'gold' ? reward.reward_qty : 0,
+      rewardDiamond: reward.reward_item === 'diamond' ? reward.reward_qty : 0,
+    };
 
-    if (userQuest.status === 'completed') {
-      await updateUserReward(user_id, reward);
+    const userServiceUrl = `http://localhost:3000/auth/${user_id}/rewards`;  // User 서비스 URL
+    const response = await axios.put(userServiceUrl, rewardData);
+
+    if (response.status === 200) {
+      // 보상이 성공적으로 지급되었을 경우, 상태를 reward_claimed로 업데이트
+      userQuest.status = 'reward_claimed';
     }
 
-    await user.findByIdAndUpdate(user_id, rewardUpdate);
+    await UserQuest.updateOne(
+      { _id: userQuest._id },
+      { $set: userQuest }
+    );
 
-    // 보상 지급 후 퀘스트 상태를 'claimed'로 업데이트
-    userQuest.status = 'claimed';
-    userQuest.claimed_at = new Date();
-    await userQuest.save();
-
-    res.json({ 
-      message: 'Reward claimed successfully', 
-      userQuest 
-    });
+    res.json({ message: 'Reward claimed successfully', userQuest });
 
   } catch (error) {
     console.error('Error claiming reward:', error);
-    res.status(500).json({ 
-      message: 'Error claiming reward', 
-      error: error.toString() 
-    });
+    res.status(500).json({ message: 'Error claiming reward', error: error.message });
   }
-});*/
-
+});
 
 router.get('/quests/:questId', async (req, res) => {
   try {
