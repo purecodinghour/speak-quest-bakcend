@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.34.0 (HEAD)
+  labels:
+    io.kompose.service: quest-processing-service
+  name: quest-processing-service
+spec:
+  containers:
+    - env:
+        - name: AUTH_SERVICE_URL
+          value: http://auth-service:3000
+        - name: MONGODB_URI
+          value: mongodb://mongo:27017/quest-processing-db
+        - name: QUEST_CATALOG_SERVICE_URL
+          value: http://quest-catalog-service:3001
+        - name: REDIS_URL
+          value: redis://redis:6379
+        - name: REWARD_CATALOG_SERVICE_URL
+          value: http://quest-catalog-service:3001
+      image: ayounghappy/speakquest-quest-processing-service:latest
+      name: quest-processing-service
+      ports:
+        - containerPort: 3002
+          protocol: TCP
+  restartPolicy: OnFailure
