@@ -3,7 +3,6 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const redis = require('redis');
 const UserQuest = require('../models/user-quest.model');
-const User = require('../../../auth-service/src/models/user.model');
 const questCatalogApi = require('../services/quest-catalog-api');
 const rewardCatalogApi = require('../services/reward-api');
 const userApi = require('../services/user-api');

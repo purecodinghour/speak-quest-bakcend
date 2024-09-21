@@ -3,8 +3,6 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const UserQuest = require('../models/user-quest.model');
-const User = require('../../../auth-service/src/models/user.model');
-const Quest = require('../../../quest-catalog-service/src/models/quest.model');
 
 // 사용자의 퀘스트 시작
 router.post('/start', async (req, res) => {

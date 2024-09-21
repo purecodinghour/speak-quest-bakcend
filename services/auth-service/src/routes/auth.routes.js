@@ -4,7 +4,7 @@ const User = require('../models/user.model');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const authMiddleware = require('../middleware/auth.middleware');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 // 사용자 등록
 router.post('/register', async (req, res) => {
@@ -111,7 +111,7 @@ router.put('/:userId/rewards', async (req, res) => {
       message: 'User rewards updated successfully',
     });
 
-  } catch (error) {
+  } catch (error) { 
     console.error('Error updating user rewards:', error);
     res.status(500).json({ message: 'Error updating user rewards', error: error.message });
   }
