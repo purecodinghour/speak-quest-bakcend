@@ -1,0 +1,64 @@
+services:
+  auth-service:
+    build: ./services/auth-service
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/auth-db
+      - JWT_SECRET=your_very_secret_key_here
+    depends_on:
+      - mongo
+
+  quest-catalog-service:
+    build: ./services/quest-catalog-service
+    ports:
+      - "3001:3001"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/quest_catalog_db
+      - AUTH_SERVICE_URL=http://auth-service:3000
+    depends_on:
+      - mongo
+
+  quest-processing-service:
+    build: ./services/quest-processing-service
+    ports:
+      - "3002:3002"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MONGODB_URI=mongodb://mongo:27017/quest-processing-db
+      - AUTH_SERVICE_URL=http://auth-service:3000
+      - QUEST_CATALOG_SERVICE_URL=http://quest-catalog-service:3001
+      - REWARD_CATALOG_SERVICE_URL=http://quest-catalog-service:3001
+    depends_on:
+      - mongo
+      - redis
+    restart: on-failure
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - AUTH_SERVICE_URL=http://auth-service:3000
+      - QUEST_CATALOG_SERVICE_URL=http://quest-catalog-service:3001
+      - QUEST_PROCESSING_SERVICE_URL=http://quest-processing-service:3002
+    depends_on:
+      - auth-service
+      - quest-catalog-service
+      - quest-processing-service
+
+  mongo:
+    image: mongo:4.4
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  mongodb_data:

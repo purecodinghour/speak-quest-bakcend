@@ -2,55 +2,85 @@ const http = require('http');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const config = require('./config');
 
+// 환경 변수에서 서비스 URL 가져오기
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:3000';
+const QUEST_CATALOG_SERVICE_URL = process.env.QUEST_CATALOG_SERVICE_URL || 'http://quest-catalog-service:3001';
+const QUEST_PROCESSING_SERVICE_URL = process.env.QUEST_PROCESSING_SERVICE_URL || 'http://quest-processing-service:3002';
+const COMMAND_SERVICE_URL = process.env.COMMAND_SERVICE_URL || 'http://command-service:3005';
+const QUERY_SERVICE_URL = process.env.QUERY_SERVICE_URL || 'http://query-service:3003';
+
 // Auth Service 프록시 설정
 const authProxy = createProxyMiddleware({
-  target: 'http://localhost:3000', // Auth 서비스의 주소
+  target: AUTH_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: (path, req) => {
-    if (path.startsWith('/auth')) {
-      return path.replace('/auth', '/auth');
-    } else if (path.startsWith('/users')) {
-      return path.replace('/users', '/users');
-    }
-    return path;
+  pathRewrite: {
+    '^/auth': '/auth',
+    '^/users': '/users'
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log('Proxying request to Auth Service:', req.method, req.url);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log('Received response from Auth Service:', proxyRes.statusCode);
   }
 });
 
 // 퀘스트 카탈로그 서비스 프록시 설정
 const questCatalogProxy = createProxyMiddleware({
-  target: 'http://localhost:3001', // 퀘스트 카탈로그 서비스의 주소
+  target: QUEST_CATALOG_SERVICE_URL,
   changeOrigin: true,
-  pathRewrite: (path, req) => {
-    if (path.startsWith('/quests')) {
-      return path.replace('/quests', '/quests');
-    } else if (path.startsWith('/rewards')) {
-      return path.replace('/rewards', '/rewards');
-    }
-    return path;
+  pathRewrite: {
+    '^/quests': '/quests',
+    '^/rewards': '/rewards'
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log('Proxying request to Quest Catalog Service:', req.method, req.url);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log('Received response from Quest Catalog Service:', proxyRes.statusCode);
   }
 });
 
 // 퀘스트 처리 서비스 프록시 설정
 const questProcessingProxy = createProxyMiddleware({
-  target: 'http://localhost:3002', // 퀘스트 처리 서비스의 주소
+  target: QUEST_PROCESSING_SERVICE_URL,
   changeOrigin: true,
   pathRewrite: {
     '^/user-quests': '/user-quests'
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log('Proxying request to Quest Processing Service:', req.method, req.url);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log('Received response from Quest Processing Service:', proxyRes.statusCode);
   }
 });
 
 const commandServiceProxy = createProxyMiddleware({
-  target: 'http://localhost:3005', // Command Service 주소
-  pathRewrite: { '^/commands': '' }, // 경로를 올바르게 리라이트 해야 함
-  changeOrigin: true,
-});
-
-// Query Service 프록시 설정
-const queryServiceProxy = createProxyMiddleware({
-  target: 'http://localhost:3003', // Query Service 주소
+  target: COMMAND_SERVICE_URL,
   changeOrigin: true,
   pathRewrite: {
-    '^/queries': '' // '/queries' 경로를 Query Service의 루트로 리라이트
+    '^/commands': ''
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log('Proxying request to Command Service:', req.method, req.url);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log('Received response from Command Service:', proxyRes.statusCode);
+  }
+});
+
+const queryServiceProxy = createProxyMiddleware({
+  target: QUERY_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: {
+    '^/queries': ''
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log('Proxying request to Query Service:', req.method, req.url);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log('Received response from Query Service:', proxyRes.statusCode);
   }
 });
 
@@ -58,22 +88,30 @@ const queryServiceProxy = createProxyMiddleware({
 const server = http.createServer((req, res) => {
   console.log(`Received request: ${req.method} ${req.url}`);
   
-  if (req.url.startsWith('/auth') || req.url.startsWith('/users')) {
-    authProxy(req, res);
-  } else if (req.url.startsWith('/quests') || req.url.startsWith('/rewards')) {
-    questCatalogProxy(req, res);
-  } else if (req.url.startsWith('/user-quests')) {
-    questProcessingProxy(req, res);
-  } else if (req.url.startsWith('/commands')) {
-    commandServiceProxy(req, res); // /commands 경로에 대한 요청을 처리
-  } else {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Welcome to SpeakQuest API Gateway');
+  try {
+    if (req.url.startsWith('/auth') || req.url.startsWith('/users')) {
+      authProxy(req, res);
+    } else if (req.url.startsWith('/quests') || req.url.startsWith('/rewards')) {
+      questCatalogProxy(req, res);
+    } else if (req.url.startsWith('/user-quests')) {
+      questProcessingProxy(req, res);
+    } else if (req.url.startsWith('/commands')) {
+      commandServiceProxy(req, res);
+    } else if (req.url.startsWith('/queries')) {
+      queryServiceProxy(req, res);
+    } else {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not Found');
+    }
+  } catch (error) {
+    console.error('Error handling request:', error);
+    res.writeHead(500, { 'Content-Type': 'text/plain' });
+    res.end('Internal Server Error');
   }
 });
 
 // 서버 시작 및 에러 처리
-const PORT = process.env.PORT || 4001;
+const PORT = process.env.PORT || 4000;
 
 server.listen(PORT, () => {
   console.log(`API Gateway is running on port ${PORT}`);

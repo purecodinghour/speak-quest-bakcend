@@ -8,15 +8,10 @@ const rewardCatalogApi = require('../services/reward-api');
 const userApi = require('../services/user-api');
 const axios = require('axios');
 const config = require('../config');
-
-const Reward = require('../../../quest-catalog-service/src/models/reward.model'); // Reward 모델 참조
 const questStartQueue = require('../queues/quest-start.queue');
 
 // Redis 클라이언트 설정
-const redisClient = redis.createClient();
-
-redisClient.on('error', (err) => console.error('Redis Client Error', err));
-redisClient.connect().then(() => console.log('Connected to Redis'));
+const redisClient = require('../utils/redis');
 
 // 캐시에서 퀘스트 가져오기
 async function getQuestFromCache(questId) {
@@ -143,6 +138,7 @@ router.post('/start', async (req, res) => {
       quest_id,
       status: 'in_progress'
     });
+    await redisClient.set(`user_quest:${user_id}:${quest_id}`, '0');
 
     if (activeQuest) {
       return res.status(400).json({ 
@@ -215,8 +211,7 @@ router.put('/update-progress', async (req, res) => {
         rewardDiamond: reward.reward_item === 'diamond' ? reward.reward_qty : 0,
       };
 
-      // User 서비스로 API 요청하여 보상 업데이트
-      const userServiceUrl = `http://localhost:3000/auth/${user_id}/rewards`;  // User 서비스 URL
+      const userServiceUrl = `${config.AUTH_SERVICE_URL}/auth/${user_id}/rewards`;
       const response = await axios.put(userServiceUrl, rewardData);
 
       if (response.status === 200) {
@@ -269,7 +264,7 @@ router.put('/claimreward', async (req, res) => {
       rewardDiamond: reward.reward_item === 'diamond' ? reward.reward_qty : 0,
     };
 
-    const userServiceUrl = `http://localhost:3000/auth/${user_id}/rewards`;  // User 서비스 URL
+    const userServiceUrl = `${config.AUTH_SERVICE_URL}/auth/${user_id}/rewards`;
     const response = await axios.put(userServiceUrl, rewardData);
 
     if (response.status === 200) {
