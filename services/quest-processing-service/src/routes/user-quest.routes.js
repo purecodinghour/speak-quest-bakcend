@@ -9,6 +9,7 @@ const userApi = require('../services/user-api');
 const axios = require('axios');
 const config = require('../config');
 const questStartQueue = require('../queues/quest-start.queue');
+const Quest = require('../models/quest.model');  
 
 // Redis 클라이언트 설정
 const redisClient = require('../utils/redis');
@@ -296,6 +297,130 @@ router.get('/quests/:questId', async (req, res) => {
     res.status(500).json({ message: 'Error fetching quest', error: error.toString() });
   }
 });
+
+
+// 유저의 활성 퀘스트 조회 (진행중인)
+router.get('/active-quests/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // 유저의 진행중인 퀘스트 가져오기
+    const activeQuests = await UserQuest.find({
+      user_id: userId,
+      status: 'in_progress'
+    });
+
+    // 각 퀘스트 정보와 함께 데이터 포맷팅
+    const formattedQuests = await Promise.all(
+      activeQuests.map(async (userQuest) => {
+        const quest = await getQuest(userQuest.quest_id); // 퀘스트 정보를 직접 조회
+        return {
+          id: userQuest._id,
+          name: quest.name,
+          description: quest.description,
+          progress: userQuest.progress,
+          totalRequired: quest.streak,
+          status: userQuest.status
+        };
+      })
+    );
+
+    res.json(formattedQuests);
+  } catch (error) {
+    console.error('Error fetching active quests:', error);
+    res.status(500).json({ message: 'Error fetching active quests', error: error.message });
+  }
+});
+
+// 유저의 완료한 퀘스트 조회 (보상 청구 안한 상태)
+router.get('/completed-quests/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const completedQuests = await UserQuest.find({
+      user_id: userId,
+      status: 'completed'
+    });
+
+    const formattedQuests = await Promise.all(
+      completedQuests.map(async (userQuest) => {
+        const quest = await getQuest(userQuest.quest_id);
+        return {
+          id: userQuest._id,
+          name: quest.name,
+          description: quest.description,
+          completedAt: userQuest.completed_at
+        };
+      })
+    );
+
+    res.json(formattedQuests);
+  } catch (error) {
+    console.error('Error fetching completed quests:', error);
+    res.status(500).json({ message: 'Error fetching completed quests', error: error.message });
+  }
+});
+
+// 유저의 보상을 받은 퀘스트 조회 (보상 청구한 상태)
+router.get('/rewarded-quests/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const rewardedQuests = await UserQuest.find({
+      user_id: userId,
+      status: 'reward_claimed'
+    });
+
+    const formattedQuests = await Promise.all(
+      rewardedQuests.map(async (userQuest) => {
+        const quest = await getQuest(userQuest.quest_id);
+        return {
+          id: userQuest._id,
+          name: quest.name,
+          description: quest.description,
+          completedAt: userQuest.completed_at,
+          rewardClaimedAt: userQuest.updated_at
+        };
+      })
+    );
+
+    res.json(formattedQuests);
+  } catch (error) {
+    console.error('Error fetching rewarded quests:', error);
+    res.status(500).json({ message: 'Error fetching rewarded quests', error: error.message });
+  }
+});
+
+// 유저의 모든 퀘스트 조회
+router.get('/all-quests/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const allQuests = await UserQuest.find({ user_id: userId });
+
+    const formattedQuests = await Promise.all(
+      allQuests.map(async (userQuest) => {
+        const quest = await getQuest(userQuest.quest_id);
+        return {
+          id: userQuest._id,
+          name: quest.name,
+          description: quest.description,
+          status: userQuest.status,
+          progress: userQuest.progress,
+          totalRequired: quest.streak,
+          completedAt: userQuest.completed_at,
+          rewardClaimedAt: userQuest.status === 'reward_claimed' ? userQuest.updated_at : null
+        };
+      })
+    );
+
+    res.json(formattedQuests);
+  } catch (error) {
+    console.error('Error fetching all quests:', error);
+    res.status(500).json({ message: 'Error fetching all quests', error: error.message });
+  }
+});
+
 // 보상 지급 로직을 별도로 분리하여 관리
 async function grantRewardToUser(user_id, reward, session) {
   const rewardUpdate = reward.reward_item === 'gold' 

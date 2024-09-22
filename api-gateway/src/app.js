@@ -1,13 +1,21 @@
+// api-gateway/src/app.js
+const url = require('url');
 const http = require('http');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const config = require('./config');
 
 // 환경 변수에서 서비스 URL 가져오기
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:3000';
-const QUEST_CATALOG_SERVICE_URL = process.env.QUEST_CATALOG_SERVICE_URL || 'http://quest-catalog-service:3001';
-const QUEST_PROCESSING_SERVICE_URL = process.env.QUEST_PROCESSING_SERVICE_URL || 'http://quest-processing-service:3002';
-const COMMAND_SERVICE_URL = process.env.COMMAND_SERVICE_URL || 'http://command-service:3005';
-const QUERY_SERVICE_URL = process.env.QUERY_SERVICE_URL || 'http://query-service:3003';
+//const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3000';
+//const QUEST_CATALOG_SERVICE_URL = process.env.QUEST_CATALOG_SERVICE_URL || 'http://localhost:3001';
+//const QUEST_PROCESSING_SERVICE_URL = process.env.QUEST_PROCESSING_SERVICE_URL || 'http://localhost:3002';
+//const COMMAND_SERVICE_URL = process.env.COMMAND_SERVICE_URL || 'http://localhost:3005';
+//const QUERY_SERVICE_URL = process.env.QUERY_SERVICE_URL || 'http://localhost:3003';
+
+const AUTH_SERVICE_URL =  'http://localhost:3000' || process.env.AUTH_SERVICE_URL;
+const QUEST_CATALOG_SERVICE_URL = 'http://localhost:3001'|| process.env.QUEST_CATALOG_SERVICE_URL;
+const QUEST_PROCESSING_SERVICE_URL = 'http://localhost:3002' ||process.env.QUEST_PROCESSING_SERVICE_URL;
+const COMMAND_SERVICE_URL ='http://localhost:3005'||process.env.COMMAND_SERVICE_URL;
+const QUERY_SERVICE_URL ='http://localhost:3003'|| process.env.QUERY_SERVICE_URL ;
 
 // Auth Service 프록시 설정
 const authProxy = createProxyMiddleware({
@@ -46,7 +54,11 @@ const questProcessingProxy = createProxyMiddleware({
   target: QUEST_PROCESSING_SERVICE_URL,
   changeOrigin: true,
   pathRewrite: {
-    '^/user-quests': '/user-quests'
+    '^/user-quests': '/user-quests',
+    '^/active-quests': '/active-quests',
+    '^/completed-quests': '/completed-quests',
+    '^/rewarded-quests': '/rewarded-quests',
+    '^/all-quests': '/all-quests'
   },
   onProxyReq: (proxyReq, req, res) => {
     console.log('Proxying request to Quest Processing Service:', req.method, req.url);
@@ -88,16 +100,23 @@ const queryServiceProxy = createProxyMiddleware({
 const server = http.createServer((req, res) => {
   console.log(`Received request: ${req.method} ${req.url}`);
   
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
+
   try {
-    if (req.url.startsWith('/auth') || req.url.startsWith('/users')) {
+    if (pathname.startsWith('/auth') || pathname.startsWith('/users')) {
       authProxy(req, res);
-    } else if (req.url.startsWith('/quests') || req.url.startsWith('/rewards')) {
+    } else if (pathname.startsWith('/quests') || pathname.startsWith('/rewards')) {
       questCatalogProxy(req, res);
-    } else if (req.url.startsWith('/user-quests')) {
+    } else if (pathname.startsWith('/user-quests') || 
+               pathname.startsWith('/active-quests') || 
+               pathname.startsWith('/completed-quests') || 
+               pathname.startsWith('/rewarded-quests') ||
+               pathname.startsWith('/all-quests')) {
       questProcessingProxy(req, res);
-    } else if (req.url.startsWith('/commands')) {
+    } else if (pathname.startsWith('/commands')) {
       commandServiceProxy(req, res);
-    } else if (req.url.startsWith('/queries')) {
+    } else if (pathname.startsWith('/queries')) {
       queryServiceProxy(req, res);
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
