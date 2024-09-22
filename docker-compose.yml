@@ -1,6 +1,6 @@
 services:
   auth-service:
-    build: ./services/auth-service
+    image: ayounghappy/speakquest-auth-service:latest  # 이미지를 Docker Hub에서 가져옴
     ports:
       - "3000:3000"
     environment:
@@ -10,7 +10,7 @@ services:
       - mongo
 
   quest-catalog-service:
-    build: ./services/quest-catalog-service
+    image: ayounghappy/speakquest-quest-catalog-service:latest  # Docker Hub 이미지 사용
     ports:
       - "3001:3001"
     environment:
@@ -20,7 +20,7 @@ services:
       - mongo
 
   quest-processing-service:
-    build: ./services/quest-processing-service
+    image: ayounghappy/speakquest-quest-processing-service:latest  # Docker Hub 이미지 사용
     ports:
       - "3002:3002"
     environment:
@@ -35,7 +35,7 @@ services:
     restart: on-failure
 
   api-gateway:
-    build: ./api-gateway
+    image: ayounghappy/speakquest-api-gateway:latest  # Docker Hub 이미지 사용
     ports:
       - "4000:4000"
     environment:
@@ -49,14 +49,14 @@ services:
       - quest-processing-service
 
   mongo:
-    image: mongo:4.4
+    image: mongo:4.4  # MongoDB 이미지는 그대로 사용
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
 
   redis:
-    image: redis:alpine
+    image: redis:alpine  # Redis 이미지는 그대로 사용
     ports:
       - "6379:6379"
 
