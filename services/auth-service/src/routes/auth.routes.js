@@ -60,7 +60,7 @@ router.post('/login', async (req, res) => {
     if (password == user.password || isPasswordValid) {
       const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
       user.loginCount = (user.loginCount || 0) + 1;
-      res.json({ message: 'Login successful', token, loginCount: user.loginCount });
+      res.json({ message: 'Login successful', token, loginCount: user.loginCount,userId: user._id });
       await user.save();
     }
     else{

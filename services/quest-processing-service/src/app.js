@@ -7,7 +7,7 @@ mongoose.set('debug', true);
 const app = express();
 
 const corsOptions = {
-  origin: ['http://localhost:3002', 'http://localhost:4000'], // React 앱의 주소
+  origin: ['http://localhost:3004','http://localhost:3000','http://localhost:3001', 'http://localhost:3002', 'http://localhost:4000'], // React 앱의 주소
   credentials: true,
 };
 

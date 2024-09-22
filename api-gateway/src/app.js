@@ -4,13 +4,6 @@ const http = require('http');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const config = require('./config');
 
-// 환경 변수에서 서비스 URL 가져오기
-//const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3000';
-//const QUEST_CATALOG_SERVICE_URL = process.env.QUEST_CATALOG_SERVICE_URL || 'http://localhost:3001';
-//const QUEST_PROCESSING_SERVICE_URL = process.env.QUEST_PROCESSING_SERVICE_URL || 'http://localhost:3002';
-//const COMMAND_SERVICE_URL = process.env.COMMAND_SERVICE_URL || 'http://localhost:3005';
-//const QUERY_SERVICE_URL = process.env.QUERY_SERVICE_URL || 'http://localhost:3003';
-
 const AUTH_SERVICE_URL =  'http://localhost:3000' || process.env.AUTH_SERVICE_URL;
 const QUEST_CATALOG_SERVICE_URL = 'http://localhost:3001'|| process.env.QUEST_CATALOG_SERVICE_URL;
 const QUEST_PROCESSING_SERVICE_URL = 'http://localhost:3002' ||process.env.QUEST_PROCESSING_SERVICE_URL;
